@@ -1,10 +1,32 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-
 export async function POST(req: Request) {
   try {
     const { nome, email } = await req.json();
+
+    if (!nome || !email) {
+      return NextResponse.json(
+        { error: 'Nome e e-mail são obrigatórios.' },
+        { status: 400 }
+      );
+    }
+
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL não configurada no ambiente.');
+      return NextResponse.json(
+        { error: 'Configuração incompleta', details: 'A variável DATABASE_URL não foi definida na Vercel.' },
+        { status: 500 }
+      );
+    }
+
+    if (!process.env.PIX_ACCESS_TOKEN) {
+      console.error('PIX_ACCESS_TOKEN não configurado no ambiente.');
+      return NextResponse.json(
+        { error: 'Configuração incompleta', details: 'A variável PIX_ACCESS_TOKEN não foi definida na Vercel.' },
+        { status: 500 }
+      );
+    }
 
     // 1. Criar ou buscar cliente
     let customer = await prisma.customer.findUnique({ where: { email } });
@@ -16,9 +38,9 @@ export async function POST(req: Request) {
     const order = await prisma.order.create({
       data: {
         customer_id: customer.id,
-        product: "Aprendizados do Velho",
+        product: 'Aprendizados do Velho',
         amount: 14.90,
-        status: "pending"
+        status: 'pending'
       }
     });
 
@@ -26,24 +48,29 @@ export async function POST(req: Request) {
     const pixResponse = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.PIX_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${process.env.PIX_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
-        'X-Idempotency-Key': order.id // Evita cobrança duplicada
+        'X-Idempotency-Key': order.id
       },
       body: JSON.stringify({
         transaction_amount: 14.90,
-        description: "E-book: Aprendizados do Velho",
-        payment_method_id: "pix",
+        description: 'E-book: Aprendizados do Velho',
+        payment_method_id: 'pix',
         payer: { email: customer.email, first_name: customer.nome }
       })
     });
 
     const pixData = await pixResponse.json();
 
-    // Se houver erro nas credenciais do Mercado Pago
     if (!pixData.id) {
-      console.error("Erro Mercado Pago:", pixData);
-      return NextResponse.json({ error: "Erro ao gerar PIX" }, { status: 400 });
+      console.error('Erro Mercado Pago:', pixData);
+      return NextResponse.json(
+        {
+          error: 'Erro ao gerar PIX',
+          details: pixData.message || JSON.stringify(pixData)
+        },
+        { status: 400 }
+      );
     }
 
     // 4. Salvar o ID do pagamento no pedido
@@ -60,7 +87,11 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    console.error('Erro no checkout:', error);
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json(
+      { error: 'Erro interno', details },
+      { status: 500 }
+    );
   }
 }

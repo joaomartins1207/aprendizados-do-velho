@@ -20,12 +20,12 @@ export default function Home() {
       });
       const data = await res.json();
       if (data.error) {
-        alert('Ocorreu um erro ao gerar o pagamento. Tente novamente.');
+        alert(data.details ? `${data.error}: ${data.details}` : data.error);
       } else {
         setPixData(data);
       }
-    } catch {
-      alert('Erro de conexão.');
+    } catch (err: any) {
+      alert(`Erro de conexão: ${err?.message || 'Tente novamente.'}`);
     }
     setLoading(false);
   };
