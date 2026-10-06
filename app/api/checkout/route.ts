@@ -20,10 +20,22 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!process.env.PIX_ACCESS_TOKEN) {
+    // Sanitiza o token do Mercado Pago (remove aspas, espaços e prefixos duplicados)
+    let pixToken = (process.env.PIX_ACCESS_TOKEN || '').trim();
+    if (
+      (pixToken.startsWith('"') && pixToken.endsWith('"')) ||
+      (pixToken.startsWith("'") && pixToken.endsWith("'"))
+    ) {
+      pixToken = pixToken.slice(1, -1).trim();
+    }
+    if (pixToken.toLowerCase().startsWith('bearer ')) {
+      pixToken = pixToken.slice(7).trim();
+    }
+
+    if (!pixToken) {
       console.error('PIX_ACCESS_TOKEN não configurado no ambiente.');
       return NextResponse.json(
-        { error: 'Configuração incompleta', details: 'A variável PIX_ACCESS_TOKEN não foi definida na Vercel.' },
+        { error: 'Configuração incompleta', details: 'A variável PIX_ACCESS_TOKEN está vazia ou ausente na Vercel.' },
         { status: 500 }
       );
     }
@@ -48,7 +60,7 @@ export async function POST(req: Request) {
     const pixResponse = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.PIX_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${pixToken}`,
         'Content-Type': 'application/json',
         'X-Idempotency-Key': order.id
       },
