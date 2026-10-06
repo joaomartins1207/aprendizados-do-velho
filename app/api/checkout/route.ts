@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Sanitiza o token do Mercado Pago (remove aspas, espaços e prefixos duplicados)
+    // Sanitiza o token do Mercado Pago
     let pixToken = (process.env.PIX_ACCESS_TOKEN || '').trim();
     if (
       (pixToken.startsWith('"') && pixToken.endsWith('"')) ||
@@ -79,7 +79,11 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao gerar PIX',
-          details: pixData.message || JSON.stringify(pixData)
+          details: pixData.message || JSON.stringify(pixData),
+          debug: {
+            tokenPrefix: pixToken.slice(0, 12),
+            tokenLength: pixToken.length
+          }
         },
         { status: 400 }
       );
