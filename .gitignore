@@ -1,0 +1,33 @@
+# Dependências
+node_modules
+/.pnp
+.pnp.js
+
+# Cache e Build do Next.js
+.next/
+out/
+build/
+dist/
+
+# Variáveis de ambiente sensíveis (NUNCA envie para o GitHub)
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Banco de dados local SQLite
+*.db
+*.db-journal
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Sistema Operacional / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
