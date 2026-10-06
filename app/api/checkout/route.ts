@@ -32,6 +32,11 @@ export async function POST(req: Request) {
       pixToken = pixToken.slice(7).trim();
     }
 
+    // Auto-correção caso a primeira letra 'A' tenha sido cortada na cópia (PP_USR -> APP_USR)
+    if (pixToken.startsWith('PP_USR-')) {
+      pixToken = 'A' + pixToken;
+    }
+
     if (!pixToken) {
       console.error('PIX_ACCESS_TOKEN não configurado no ambiente.');
       return NextResponse.json(
@@ -79,11 +84,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error: 'Erro ao gerar PIX',
-          details: pixData.message || JSON.stringify(pixData),
-          debug: {
-            tokenPrefix: pixToken.slice(0, 12),
-            tokenLength: pixToken.length
-          }
+          details: pixData.message || JSON.stringify(pixData)
         },
         { status: 400 }
       );
