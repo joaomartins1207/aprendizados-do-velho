@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// Carrega .env manualmente se existir
+// Carrega .env se existir
 const envPath = path.join(__dirname, '..', '.env');
 let dbUrl = process.env.DATABASE_URL;
 
@@ -21,8 +21,8 @@ const schemaContent = `generator client {
 }
 
 datasource db {
-  provider  = "${isPostgres ? 'postgresql' : 'sqlite'}"
-  url       = env("DATABASE_URL")${isPostgres ? '\n  directUrl = env("DIRECT_URL")' : ''}
+  provider = "${isPostgres ? 'postgresql' : 'sqlite'}"
+  url      = env("DATABASE_URL")
 }
 
 model Customer {
@@ -58,7 +58,7 @@ model Download {
 `;
 
 fs.writeFileSync(schemaPath, schemaContent, 'utf8');
-console.log(`[prepare-db] Prisma configurado para: ${isPostgres ? 'PostgreSQL (Produção/Neon)' : 'SQLite (Local)'}`);
+console.log(`[prepare-db] Prisma configurado para: ${isPostgres ? 'PostgreSQL (Neon/Vercel)' : 'SQLite (Local)'}`);
 
 try {
   execSync('npx prisma generate', { stdio: 'inherit' });
