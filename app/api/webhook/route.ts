@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sendDeliveryEmail } from '@/lib/email';
 
 export async function POST(req: Request) {
   try {
@@ -19,16 +20,30 @@ export async function POST(req: Request) {
     }
 
     if (paymentId) {
+      let pixToken = (process.env.PIX_ACCESS_TOKEN || '').trim();
+      if (
+        (pixToken.startsWith('"') && pixToken.endsWith('"')) ||
+        (pixToken.startsWith("'") && pixToken.endsWith("'"))
+      ) {
+        pixToken = pixToken.slice(1, -1).trim();
+      }
+      if (pixToken.toLowerCase().startsWith('bearer ')) {
+        pixToken = pixToken.slice(7).trim();
+      }
+      if (pixToken.startsWith('PP_USR-')) {
+        pixToken = 'A' + pixToken;
+      }
+
       // Verifica o status real do pagamento na API oficial do Mercado Pago por segurança
       const mPagoRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: { Authorization: `Bearer ${process.env.PIX_ACCESS_TOKEN}` }
+        headers: { Authorization: `Bearer ${pixToken}` }
       });
       const mPagoData = await mPagoRes.json();
 
       if (mPagoData.status === 'approved') {
         const order = await prisma.order.findUnique({
           where: { payment_id: paymentId.toString() },
-          include: { customer: true }
+          include: { customer: true, downloads: true }
         });
 
         if (order && order.status !== 'paid') {
@@ -42,40 +57,19 @@ export async function POST(req: Request) {
           const dataExpiracao = new Date();
           dataExpiracao.setDate(dataExpiracao.getDate() + 30);
 
-          const download = await prisma.download.create({
-            data: {
-              order_id: order.id,
-              email: order.customer.email,
-              expires_at: dataExpiracao
-            }
-          });
-
-          // 3. Envia E-mail de entrega via Resend (se as credenciais existirem)
-          if (process.env.EMAIL_API_KEY && process.env.EMAIL_FROM) {
-            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-            const downloadLink = `${siteUrl}/api/download/${download.download_token}`;
-
-            try {
-              await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${process.env.EMAIL_API_KEY}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  from: process.env.EMAIL_FROM,
-                  to: order.customer.email,
-                  subject: 'Seu Aprendizados do Velho está pronto 📖',
-                  html: `<p>Olá, ${order.customer.nome}.</p>
-                         <p>Obrigado pela sua compra! Seu exemplar já está disponível.</p>
-                         <p><a href="${downloadLink}" style="padding: 15px 30px; background-color: #D4AF37; color: #fff; text-decoration: none; border-radius: 5px; font-size: 18px; display: inline-block; margin-top: 10px;">ABRIR MEU LIVRO</a></p>
-                         <p>Boa leitura!<br>— Augusto</p>`
-                })
-              });
-            } catch (emailErr) {
-              console.error('Erro ao enviar e-mail:', emailErr);
-            }
+          let download = order.downloads[0];
+          if (!download) {
+            download = await prisma.download.create({
+              data: {
+                order_id: order.id,
+                email: order.customer.email,
+                expires_at: dataExpiracao
+              }
+            });
           }
+
+          // 3. Envia e-mail de entrega para o cliente
+          await sendDeliveryEmail(order.customer.nome, order.customer.email, download.download_token);
         }
       }
     }

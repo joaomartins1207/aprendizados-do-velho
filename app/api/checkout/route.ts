@@ -73,6 +73,7 @@ export async function POST(req: Request) {
         transaction_amount: 14.90,
         description: 'E-book: Aprendizados do Velho',
         payment_method_id: 'pix',
+        notification_url: `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://aprendizados-do-velho.vercel.app').replace(/\/$/, '')}/api/webhook`,
         payer: { email: customer.email, first_name: customer.nome }
       })
     });
